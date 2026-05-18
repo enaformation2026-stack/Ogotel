@@ -57,7 +57,7 @@ const rowVariants = {
     y: 0,
     transition: { delay: i * 0.06, duration: 0.35, ease: 'easeOut' as const },
   }),
-} satisfies import('framer-motion').Variants
+}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
