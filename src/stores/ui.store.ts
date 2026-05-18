@@ -15,11 +15,15 @@ export type ActivePage =
   | 'settings-subscription'
   | 'settings-account';
 
+export type AuthView = 'login' | 'register' | 'forgot-password' | 'reset-password';
+
 interface UIState {
   activePage: ActivePage;
   setActivePage: (page: ActivePage) => void;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  authView: AuthView | null;
+  setAuthView: (view: AuthView | null) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -29,6 +33,8 @@ export const useUIStore = create<UIState>()(
       setActivePage: (page) => set({ activePage: page }),
       sidebarCollapsed: false,
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+      authView: null,
+      setAuthView: (view) => set({ authView: view }),
     }),
     {
       name: 'ogotel-ui-store',

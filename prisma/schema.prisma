@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,20 +10,319 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Auth models (NextAuth compatible) ──────────────────────────────────
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          String    @default("owner") // owner, manager, receptionist, accountant
+  language      String    @default("fr")
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  organizationMemberships OrganizationMember[]
+  sessions              Session[]
+  accounts              Account[]
+  reservations          Reservation[]
+  payments              Payment[]
+
+  @@index([email])
 }
 
-model Post {
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Organization (multi-tenant) ───────────────────────────────────────
+
+model Organization {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  name      String
+  slug      String   @unique
+  email     String
+  phone     String?
+  country   String   @default("CI")
+  city      String?
+  logoUrl   String?
+  plan      String   @default("trial") // trial, starter, pro, enterprise
+  subscriptionStatus String @default("active")
+  maxHotels Int      @default(1)
+  maxUsers  Int      @default(5)
+  currency  String   @default("XOF")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations
+  members     OrganizationMember[]
+  hotels      Hotel[]
+  roomTypes   RoomType[]
+  rooms       Room[]
+  guests      Guest[]
+  reservations Reservation[]
+  payments    Payment[]
+
+  @@index([slug])
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String   @default("member") // owner, admin, member
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// ─── Hotels ────────────────────────────────────────────────────────────
+
+model Hotel {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  description    String?
+  stars          Int?
+  email          String?
+  phone          String?
+  city           String?
+  district       String?
+  address        String?
+  logoUrl        String?
+  coverImageUrl  String?
+  checkInTime    String   @default("14:00")
+  checkOutTime   String   @default("12:00")
+  taxRate        Float    @default(18.0)
+  defaultCurrency String @default("XOF")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roomTypes    RoomType[]
+  rooms        Room[]
+  reservations Reservation[]
+  payments     Payment[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+// ─── Room Types ────────────────────────────────────────────────────────
+
+model RoomType {
+  id             String   @id @default(cuid())
+  organizationId String
+  hotelId        String
+  name           String
+  description    String?
+  basePrice      Float
+  maxOccupancy   Int
+  bedCount       Int      @default(1)
+  bedType        String?
+  amenities      String   @default("[]" ) // JSON array
+  images         String   @default("[]")  // JSON array
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hotel        Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  rooms        Room[]
+
+  @@index([organizationId])
+  @@index([hotelId])
+}
+
+// ─── Rooms ─────────────────────────────────────────────────────────────
+
+model Room {
+  id             String    @id @default(cuid())
+  organizationId String
+  hotelId        String
+  roomTypeId     String
+  number         String
+  floor          String?
+  name           String?
+  status         String    @default("available") // available, occupied, cleaning, maintenance, blocked
+  priceOverride  Float?
+  maintenanceNotes String?
+  lastCleanedAt  DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hotel        Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  roomType     RoomType     @relation(fields: [roomTypeId], references: [id])
+  reservations Reservation[]
+
+  @@unique([hotelId, number])
+  @@index([organizationId])
+  @@index([hotelId])
+  @@index([status])
+}
+
+// ─── Guests ────────────────────────────────────────────────────────────
+
+model Guest {
+  id             String    @id @default(cuid())
+  organizationId String
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  gender         String?   // male, female, other
+  nationality    String?
+  country        String?
+  city           String?
+  address        String?
+  idNumber       String?   // Passport or national ID
+  totalStays     Int       @default(0)
+  totalSpent     Float     @default(0)
+  lastStayAt     DateTime?
+  tags           String    @default("[]") // JSON array: VIP, Corporate, etc.
+  notes          String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+// ─── Reservations ──────────────────────────────────────────────────────
+
+model Reservation {
+  id              String    @id @default(cuid())
+  organizationId  String
+  hotelId         String
+  roomId          String?
+  guestId         String
+  reference       String    @unique
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  actualCheckIn   DateTime?
+  actualCheckOut  DateTime?
+  nights          Int
+  adults          Int       @default(1)
+  children        Int       @default(0)
+  roomRate        Float
+  subtotal        Float?
+  taxAmount       Float     @default(0)
+  discountAmount  Float     @default(0)
+  totalAmount     Float
+  paidAmount      Float     @default(0)
+  balanceDue      Float
+  status          String    @default("pending") // pending, confirmed, checked_in, checked_out, cancelled, no_show
+  specialRequests String?
+  notes           String?
+  source          String    @default("direct") // direct, booking.com, walk_in, phone, email, website
+  isWalkIn        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hotel        Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room         Room?        @relation(fields: [roomId], references: [id])
+  guest        Guest        @relation(fields: [guestId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+  createdById  String
+  payments     Payment[]
+
+  @@index([organizationId])
+  @@index([hotelId])
+  @@index([guestId])
+  @@index([status])
+  @@index([checkInDate])
+  @@index([checkOutDate])
+  @@index([createdById])
+}
+
+// ─── Payments ──────────────────────────────────────────────────────────
+
+model Payment {
+  id             String    @id @default(cuid())
+  organizationId String
+  hotelId        String
+  reservationId  String
+  reference      String    @unique
+  amount         Float
+  currency       String    @default("XOF")
+  method         String    // cash, orange_money, mtn_money, wave, moov_money, card, bank_transfer
+  status         String    @default("pending") // pending, completed, failed, refunded, partial
+  mobileNumber   String?
+  operatorRef    String?
+  notes          String?
+  paidAt         DateTime?
+  createdBy      User      @relation(fields: [createdById], references: [id])
+  createdById    String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hotel        Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  reservation  Reservation    @relation(fields: [reservationId], references: [id])
+
+  @@index([organizationId])
+  @@index([hotelId])
+  @@index([reservationId])
+  @@index([status])
+  @@index([createdById])
 }
