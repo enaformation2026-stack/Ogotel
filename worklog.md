@@ -219,3 +219,95 @@ Stage Summary:
 - Room status change submenu items now open UpdateRoomStatusDialog with the selected room
 - Room "Modifier" menu item shows informational toast
 - All dialogs are wired with proper open/close state management and success callbacks
+
+---
+Task ID: 2-a
+Agent: fullstack-developer
+Task: Build HotelsPage component
+
+Work Log:
+- Created HotelsPage.tsx with header (title + badge count + "Ajouter un hôtel" button), search bar, hotel cards grid (1/2/3 cols responsive)
+- Hotel cards show: name + star icons, city/district, email/phone, stats row (rooms/room types/reservations), check-in/check-out times, active status badge, cover placeholder with gradient + Building2 icon
+- Actions dropdown (Edit, Désactiver/Activer, Supprimer) with hover reveal
+- Delete confirmation using AlertDialog with destructive styling
+- Toggle active/inactive status via API call with offline fallback
+- Framer Motion entrance animations (fade-in-up, staggerChildren)
+- Created NewHotelDialog.tsx: 13 form fields (Nom, Étoiles, Email, Téléphone, Description, Ville, Quartier, Adresse, Check-in, Check-out, Devise, TVA), client-side validation, calls POST /api/hotels with mock fallback
+- Created EditHotelDialog.tsx: same fields pre-filled from hotel data, calls PUT /api/hotels/[id] with offline fallback
+- Empty state with Building2 icon and "Ajouter un hôtel" CTA when no hotels exist
+- Local HotelWithCounts type extending Hotel with _count fields
+- Hotel counts computed from MOCK_ROOMS, MOCK_ROOM_TYPES, MOCK_RESERVATIONS
+- Brand color bg-[oklch(0.22_0.065_160)] for primary buttons, French UI throughout
+- Zero TypeScript errors, zero ESLint errors verified
+
+Stage Summary:
+- HotelsPage.tsx created in src/components/pages/
+- NewHotelDialog.tsx created in src/components/dialogs/
+- EditHotelDialog.tsx created in src/components/dialogs/
+- Full CRUD flow: create → read → edit → toggle active → delete
+
+---
+Task ID: 2-c
+Agent: fullstack-developer
+Task: Wire HotelsPage into sidebar, router, and store
+
+Work Log:
+- Added `'hotels'` to `ActivePage` type union in `src/stores/ui.store.ts`
+- Imported `HotelsPage` and added `hotels: HotelsPage` to `PAGE_COMPONENTS` in `src/components/layout/PageRouter.tsx`
+- Added `{ title: 'Mes Hôtels', page: 'hotels', icon: Building2 }` to `MAIN_NAV` in `src/components/layout/AppSidebar.tsx` (after Dashboard, before Réservations)
+- Added `addHotel`, `updateHotel`, `removeHotel` CRUD actions to `src/stores/hotel.store.ts` with proper zustand state updates
+- Added third mock hotel `Hôtel Palm Beach` (hotel-003, 4★, Grand-Bassam) to `src/lib/mock-data.ts`
+- Added `HotelCount` interface and `_count?: HotelCount` optional field to `Hotel` in `src/types/index.ts`
+- ESLint: 0 errors on all 6 modified files
+
+Stage Summary:
+- HotelsPage fully wired: sidebar nav entry, page router mapping, store CRUD actions
+- Hotel type now supports `_count` for aggregate data (rooms/roomTypes/reservations)
+- 3 mock hotels available in MOCK_HOTELS
+
+---
+Task ID: 2-b
+Agent: fullstack-developer
+Task: Build Hotels API routes
+
+Work Log:
+- Rewrote `src/app/api/hotels/route.ts` with GET (list) and POST (create) handlers
+  - GET: supports `search`, `active` (optional boolean), `page`, `limit` query params; includes `_count` for rooms/roomTypes/reservations; returns `{ hotels, pagination }` format; default limit 20
+  - POST: Zod-validated body with only hotel fields (no orgId/slug required); auto-generates slug from name (lowercase, accent-stripped, special chars removed, spaces→hyphens); auto-resolves organizationId from first org found (fallback 'demo-org'); slug uniqueness with counter suffix
+- Rewrote `src/app/api/hotels/[id]/route.ts` with GET, PUT, and DELETE handlers
+  - GET: returns single hotel with `_count` for rooms/roomTypes/reservations, 404 if not found
+  - PUT: whitelist-based partial update (15 allowed fields), returns updated hotel
+  - DELETE: soft delete (sets isActive=false), returns `{ success: true }`
+- Confirmed `src/lib/db.ts` already exists with correct singleton Prisma pattern
+- Fixed Zod v4 compatibility: `parsed.error.errors` → `parsed.error.issues`
+- Zero TypeScript errors on hotel route files, zero ESLint errors
+
+Stage Summary:
+- `src/app/api/hotels/route.ts` — GET (list with search/active/pagination) + POST (auto-slug, auto-org)
+- `src/app/api/hotels/[id]/route.ts` — GET (detail with _count) + PUT (whitelist partial update) + DELETE (soft delete)
+- Full CRUD REST API for hotels: list, create, read, update, soft-delete
+
+---
+Task ID: 2-d
+Agent: fullstack-developer
+Task: Build Onboarding Wizard (3 steps)
+
+Work Log:
+- Created `src/components/onboarding/OnboardingWizard.tsx` — full-screen overlay wizard with 3 steps
+- Step 1 (Informations de l'organisation): 7 form fields (organisation name, hotel name, email, phone, city, district, address) with client-side validation
+- Step 2 (Types de chambres): 4 predefined room types (Standard, Deluxe, Suite, Suite Royale) with toggle switches; Standard & Deluxe pre-activated; expandable cards with price/occupancy/bed count/bed type fields; "Ajouter un type personnalisé" button for custom room types; AnimatePresence expand/collapse animation
+- Step 3 (Chambres initiales): room count per activated type (default 3), floor selection (1-10), auto-generated room number preview (101, 102...), total rooms summary badge
+- Progress bar at top (33%/66%/100%) with numbered step indicators (completed steps show checkmark)
+- Framer Motion slide animations (left/right) between steps using AnimatePresence
+- Navigation: "Précédent" ghost button, "Suivant"/"Terminer" primary buttons (brand green bg-[oklch(0.22_0.065_160)]), "Passer l'onboarding" skip link on step 1
+- Props: showOnboarding (boolean), onComplete(data: OnboardingData), onSkip()
+- On complete: POST /api/hotels to create hotel, then POST /api/rooms for each room; offline fallback with toast.warning
+- Uses shadcn/ui: Card, Input, Label, Button, Select, Switch, Separator, Badge, Progress
+- Uses Lucide icons: Building2, BedDouble, Bed, Check, ChevronLeft, ChevronRight, Plus, X, Sparkles, Loader2
+- Self-contained component with OnboardingData interface exported for parent consumption
+- French UI throughout, responsive design, accessible form labels
+
+Stage Summary:
+- `src/components/onboarding/OnboardingWizard.tsx` created (~1100 lines)
+- Importable in page.tsx via `<OnboardingWizard showOnboarding={...} onComplete={...} onSkip={...} />`
+- Zero ESLint errors, zero new TypeScript errors

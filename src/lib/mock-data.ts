@@ -49,6 +49,24 @@ export const MOCK_HOTELS: Hotel[] = [
     defaultCurrency: 'FCFA',
     isActive: true,
   },
+  {
+    id: 'hotel-003',
+    organizationId: 'org-001',
+    name: 'Hôtel Palm Beach',
+    slug: 'hotel-palm-beach',
+    description: 'Hôtel 4 étoiles face à la mer à Bassam',
+    stars: 4,
+    email: 'info@palmbeach.ci',
+    phone: '+225 27 30 40 50 60',
+    city: 'Grand-Bassam',
+    district: 'France',
+    address: 'Boulevard de la Mer, Grand-Bassam',
+    checkInTime: '14:00',
+    checkOutTime: '12:00',
+    taxRate: 0,
+    defaultCurrency: 'FCFA',
+    isActive: true,
+  },
 ];
 
 // ==========================================

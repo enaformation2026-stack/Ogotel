@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type ActivePage =
   | 'dashboard'
+  | 'hotels'
   | 'reservations'
   | 'rooms'
   | 'room-types'

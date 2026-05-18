@@ -47,6 +47,7 @@ interface NavItem {
 
 const MAIN_NAV: NavItem[] = [
   { title: 'Dashboard', page: 'dashboard', icon: LayoutDashboard },
+  { title: 'Mes Hôtels', page: 'hotels', icon: Building2 },
   { title: 'Réservations', page: 'reservations', icon: CalendarDays },
   { title: 'Chambres', page: 'rooms', icon: BedDouble },
   { title: 'Clients', page: 'guests', icon: Users },

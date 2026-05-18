@@ -53,6 +53,12 @@ export type SubscriptionStatus =
 
 export type GenderType = 'male' | 'female' | 'other';
 
+export interface HotelCount {
+  rooms: number;
+  roomTypes: number;
+  reservations: number;
+}
+
 export interface Hotel {
   id: string;
   organizationId: string;
@@ -72,6 +78,7 @@ export interface Hotel {
   taxRate: number;
   defaultCurrency: string;
   isActive: boolean;
+  _count?: HotelCount;
 }
 
 export interface RoomType {

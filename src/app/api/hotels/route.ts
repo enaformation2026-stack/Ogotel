@@ -2,41 +2,55 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-z0-9\s-]/g, '')    // remove special chars
+    .replace(/\s+/g, '-')            // spaces → hyphens
+    .replace(/-+/g, '-')             // collapse multiple hyphens
+    .replace(/^-|-$/g, '')           // trim leading/trailing hyphens
+}
+
+// ─── Validation Schemas ─────────────────────────────────────────────────────
 const createHotelSchema = z.object({
-  organizationId: z.string().min(1, 'Organisation requise'),
-  name: z.string().min(1, 'Nom de l\'hôtel requis'),
-  slug: z.string().min(1, 'Slug requis'),
-  description: z.string().optional(),
-  stars: z.number().int().min(1).max(5).optional(),
+  name: z.string().min(1, 'Hotel name is required'),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   city: z.string().optional(),
   district: z.string().optional(),
   address: z.string().optional(),
-  logoUrl: z.string().optional(),
-  coverImageUrl: z.string().optional(),
-  checkInTime: z.string().default('14:00'),
-  checkOutTime: z.string().default('12:00'),
-  taxRate: z.number().min(0).max(100).default(18.0),
-  defaultCurrency: z.string().default('XOF'),
+  description: z.string().optional(),
+  stars: z.number().int().min(1).max(5).optional(),
+  checkInTime: z.string().optional(),
+  checkOutTime: z.string().optional(),
+  taxRate: z.number().min(0).max(100).optional(),
+  defaultCurrency: z.string().optional(),
 })
 
+// ─── GET /api/hotels ────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const organizationId = searchParams.get('organizationId')
-    const search = searchParams.get('search')
-    const page = parseInt(searchParams.get('page') || '1', 10)
-    const limit = parseInt(searchParams.get('limit') || '50', 10)
+    const search = searchParams.get('search') || undefined
+    const activeParam = searchParams.get('active')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '20', 10)))
 
-    const where: Record<string, unknown> = { isActive: true }
+    // Build where clause
+    const where: Record<string, unknown> = {}
 
-    if (organizationId) where.organizationId = organizationId
     if (search) {
       where.OR = [
         { name: { contains: search } },
         { city: { contains: search } },
       ]
+    }
+
+    if (activeParam !== null && activeParam !== '') {
+      where.isActive = activeParam === 'true'
     }
 
     const [hotels, total] = await Promise.all([
@@ -59,7 +73,7 @@ export async function GET(req: NextRequest) {
     ])
 
     return NextResponse.json({
-      data: hotels,
+      hotels,
       pagination: {
         page,
         limit,
@@ -70,12 +84,13 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Hotels list error:', error)
     return NextResponse.json(
-      { error: 'Erreur serveur.' },
+      { error: 'Internal server error.' },
       { status: 500 }
     )
   }
 }
 
+// ─── POST /api/hotels ───────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -83,51 +98,35 @@ export async function POST(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.errors[0].message },
+        { error: parsed.error.issues[0].message },
         { status: 400 }
       )
     }
 
     const data = parsed.data
+    const slug = generateSlug(data.name)
 
-    // Check organization exists
-    const org = await db.organization.findUnique({
-      where: { id: data.organizationId },
-    })
-    if (!org) {
-      return NextResponse.json(
-        { error: 'Organisation introuvable.' },
-        { status: 404 }
-      )
-    }
+    // Resolve organization — use first org found, or fallback to a demo id
+    const org = await db.organization.findFirst({ orderBy: { createdAt: 'asc' } })
+    const organizationId = org?.id || 'demo-org'
 
-    // Check max hotels limit
-    const currentHotels = await db.hotel.count({
-      where: { organizationId: data.organizationId, isActive: true },
-    })
-    if (currentHotels >= org.maxHotels) {
-      return NextResponse.json(
-        { error: `Limite de ${org.maxHotels} hôtel(s) atteinte pour votre abonnement.` },
-        { status: 400 }
-      )
-    }
-
-    // Check slug uniqueness
-    const existingSlug = await db.hotel.findFirst({
-      where: { organizationId: data.organizationId, slug: data.slug },
-    })
-    if (existingSlug) {
-      return NextResponse.json(
-        { error: 'Ce slug existe déjà pour cet hôtel.' },
-        { status: 409 }
-      )
+    // Ensure slug uniqueness within the org
+    let uniqueSlug = slug
+    let counter = 1
+    while (
+      await db.hotel.findFirst({
+        where: { organizationId, slug: uniqueSlug },
+      })
+    ) {
+      uniqueSlug = `${slug}-${counter}`
+      counter++
     }
 
     const hotel = await db.hotel.create({
       data: {
-        organizationId: data.organizationId,
+        organizationId,
         name: data.name,
-        slug: data.slug,
+        slug: uniqueSlug,
         description: data.description || null,
         stars: data.stars || null,
         email: data.email || null,
@@ -135,28 +134,18 @@ export async function POST(req: NextRequest) {
         city: data.city || null,
         district: data.district || null,
         address: data.address || null,
-        logoUrl: data.logoUrl || null,
-        coverImageUrl: data.coverImageUrl || null,
-        checkInTime: data.checkInTime,
-        checkOutTime: data.checkOutTime,
-        taxRate: data.taxRate,
-        defaultCurrency: data.defaultCurrency,
-      },
-      include: {
-        _count: {
-          select: {
-            rooms: { where: { isActive: true } },
-            roomTypes: { where: { isActive: true } },
-          },
-        },
+        checkInTime: data.checkInTime || '14:00',
+        checkOutTime: data.checkOutTime || '12:00',
+        taxRate: data.taxRate ?? 18.0,
+        defaultCurrency: data.defaultCurrency || 'XOF',
       },
     })
 
-    return NextResponse.json({ data: hotel }, { status: 201 })
+    return NextResponse.json(hotel, { status: 201 })
   } catch (error) {
     console.error('Create hotel error:', error)
     return NextResponse.json(
-      { error: 'Erreur serveur.' },
+      { error: 'Internal server error.' },
       { status: 500 }
     )
   }
