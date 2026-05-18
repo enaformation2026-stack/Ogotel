@@ -35,6 +35,8 @@ import {
   XCircle,
   Calendar,
 } from 'lucide-react'
+import { NewReservationDialog } from '@/components/dialogs/NewReservationDialog'
+import { toast } from 'sonner'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -103,6 +105,11 @@ function countByStatus(
 export function ReservationsPage() {
   const [activeFilter, setActiveFilter] = React.useState<FilterKey>('all')
   const [searchQuery, setSearchQuery] = React.useState('')
+  const [showNewDialog, setShowNewDialog] = React.useState(false)
+
+  const handleRefresh = () => {
+    setShowNewDialog(false)
+  }
 
   const filtered = React.useMemo(() => {
     let result = MOCK_RESERVATIONS
@@ -152,7 +159,7 @@ export function ReservationsPage() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button disabled className="gap-2">
+          <Button className="gap-2" onClick={() => setShowNewDialog(true)}>
             <Plus className="size-4" />
             <span className="hidden sm:inline">Nouvelle réservation</span>
             <span className="sm:hidden">Nouvelle</span>
@@ -686,6 +693,13 @@ export function ReservationsPage() {
           </>
         )}
       </Card>
+
+      {/* New Reservation Dialog */}
+      <NewReservationDialog
+        open={showNewDialog}
+        onOpenChange={setShowNewDialog}
+        onSuccess={handleRefresh}
+      />
     </div>
   )
 }

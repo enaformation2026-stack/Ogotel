@@ -154,3 +154,68 @@ Stage Summary:
 - Demo credentials: mamadou@hotel-cocody.ci / demo1234
 - Database seeded with realistic African hotel data
 - ESLint 0 errors, all APIs tested
+
+---
+Task ID: 11
+Agent: API Routes Builder
+Task: Create CRUD API routes for rooms, guests, reservations, payments, hotels
+
+Work Log:
+- Created GET/POST /api/rooms — list with filters (hotelId, status, search), create with duplicate check
+- Created GET/PATCH/DELETE /api/rooms/[id] — detail with reservations, update status/price, soft delete
+- Created GET/POST /api/guests — list with search (name/email/phone), pagination, create with duplicate email check
+- Created GET/PATCH/DELETE /api/guests/[id] — detail with stats, update, delete (blocks if active reservations)
+- Created GET/POST /api/reservations — list with filters (status, date range, search), create with reference RES-YYYYMMDD-XXX, room conflict check, walk-in support
+- Created GET/PATCH/DELETE /api/reservations/[id] — detail with all relations, status transitions (confirm/check_in/check_out/cancel/no_show) with room status sync, delete with guard
+- Created GET/POST /api/payments — list with filters (reservation, status, method, date), create with reference PAY-YYYYMMDD-XXX, balance validation, auto-update reservation paidAmount
+- Created GET/POST /api/hotels — list with room counts, create with max hotel limit check and slug uniqueness
+- Created GET/PATCH /api/hotels/[id] — detail with stats (room status, revenue, occupancy, today arrivals/departures), update with slug uniqueness check
+
+Stage Summary:
+- 9 API route files created with full CRUD operations
+- All routes use Zod validation and Prisma queries with proper relations
+- Reference generation pattern: PREFIX-YYYYMMDD-XXX with uniqueness guarantee
+- Reservation status transitions include room status synchronization
+- Payment creation auto-updates reservation balance
+- ESLint 0 errors verified
+
+---
+Task ID: 12
+Agent: Dialog Components Builder
+Task: Create CRUD dialog components for reservations, guests, payments, rooms
+
+Work Log:
+- Created NewReservationDialog (3-step wizard): guest search/select, room selection with availability filter, date picker with night count, price calculation, review & confirm step
+- Created NewGuestDialog: full form with 54 African countries dropdown, nationality auto-mapping, inline Zod validation, VIP/Corporate tag checkboxes
+- Created NewPaymentDialog: reservation search with balance display, 7 payment methods including mobile money (Orange Money, MTN, Wave, Moov Money), mobile number field for mobile money, amount auto-fill with remaining balance
+- Created NewRoomDialog: room type selection with live info display (price, occupancy, beds), room number/floor/name fields, fetches room types from API with mock fallback
+- Created UpdateRoomStatusDialog: colored status grid (5 statuses), current status badge, conditional maintenance notes field when status=maintenance
+- Created API routes: POST/GET /api/reservations, POST/GET /api/guests, POST/GET /api/payments, POST/GET /api/rooms, PATCH /api/rooms/[id]
+- All dialogs use shadcn/ui Dialog, Select, Calendar/Popover, toast from sonner, Loader2 spinner for loading states
+- French language labels throughout, OGOTEL green brand color for primary buttons
+- ESLint 0 errors verified
+
+Stage Summary:
+- 5 dialog components created in src/components/dialogs/
+- 5 API route files created for CRUD operations
+- All dialogs use shadcn/ui, toast notifications, loading states
+- French language throughout, mobile responsive
+
+---
+Task ID: 13
+Agent: full-stack-developer
+Task: Wire dialog components into page components (enable buttons, add state, render dialogs)
+
+Work Log:
+- Updated ReservationsPage.tsx: imported NewReservationDialog + toast, added showNewDialog state, removed disabled from "Nouvelle réservation" button with onClick, added handleRefresh callback, rendered dialog at bottom
+- Updated RoomsPage.tsx: imported NewRoomDialog + UpdateRoomStatusDialog + toast, added showNewRoomDialog/showStatusDialog/selectedRoom states, removed disabled from "Ajouter une chambre" button with onClick, updated RoomCard to accept onStatusChange/onEdit props, wired status submenu items with onSelect to open UpdateRoomStatusDialog, wired Modifier with onSelect to show toast, rendered both dialogs at bottom
+- Updated GuestsPage.tsx: imported NewGuestDialog + toast, added showNewDialog state, removed disabled from "Nouveau client" button with onClick, rendered dialog at bottom with onSuccess toast
+- Updated PaymentsPage.tsx: imported NewPaymentDialog + toast, added showNewDialog state, added onClick to "Nouveau paiement" button, rendered dialog at bottom
+- All MOCK_DATA sources kept intact (no data fetching changes)
+- ESLint 0 errors verified
+
+Stage Summary:
+- All 4 page components now have functional "New" buttons that open their respective CRUD dialogs
+- Room status change submenu items now open UpdateRoomStatusDialog with the selected room
+- Room "Modifier" menu item shows informational toast
+- All dialogs are wired with proper open/close state management and success callbacks

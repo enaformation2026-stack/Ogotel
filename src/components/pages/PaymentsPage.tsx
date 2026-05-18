@@ -34,6 +34,8 @@ import {
   CreditCard,
   Building,
 } from 'lucide-react'
+import { NewPaymentDialog } from '@/components/dialogs/NewPaymentDialog'
+import { toast } from 'sonner'
 
 // ==========================================
 // CONFIGURATION
@@ -555,6 +557,7 @@ export function PaymentsPage() {
     'all' | PaymentStatus
   >('all')
   const [searchQuery, setSearchQuery] = React.useState('')
+  const [showNewDialog, setShowNewDialog] = React.useState(false)
 
   // Filter payments
   const filteredPayments = React.useMemo(() => {
@@ -602,7 +605,7 @@ export function PaymentsPage() {
             Gérez les paiements et suivez les encaissements
           </p>
         </div>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => setShowNewDialog(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Nouveau paiement
         </Button>
@@ -633,6 +636,13 @@ export function PaymentsPage() {
       {/* Payments Table (Desktop) + Cards (Mobile) */}
       <PaymentsTable payments={filteredPayments} />
       <PaymentsCards payments={filteredPayments} />
+
+      {/* New Payment Dialog */}
+      <NewPaymentDialog
+        open={showNewDialog}
+        onOpenChange={setShowNewDialog}
+        onSuccess={() => setShowNewDialog(false)}
+      />
     </div>
   )
 }

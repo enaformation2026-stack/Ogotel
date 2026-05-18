@@ -23,6 +23,8 @@ import {
 import { MOCK_GUESTS } from '@/lib/mock-data'
 import { formatFCFA, formatRelativeDate, type Guest } from '@/types'
 import { Plus, Search, MoreVertical, Eye, Pencil, Users } from 'lucide-react'
+import { NewGuestDialog } from '@/components/dialogs/NewGuestDialog'
+import { toast } from 'sonner'
 
 // ==========================================
 // CONSTANTS
@@ -78,6 +80,11 @@ function getTagStyle(tag: string): string {
 
 export function GuestsPage() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [showNewDialog, setShowNewDialog] = useState(false)
+
+  const handleRefresh = () => {
+    setShowNewDialog(false)
+  }
 
   const filteredGuests = useMemo(() => {
     if (!searchQuery.trim()) return MOCK_GUESTS
@@ -110,7 +117,7 @@ export function GuestsPage() {
               className="pl-9 w-full sm:w-72"
             />
           </div>
-          <Button variant="outline" disabled>
+          <Button variant="outline" onClick={() => setShowNewDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Nouveau client
           </Button>
@@ -368,6 +375,16 @@ export function GuestsPage() {
           </div>
         </>
       )}
+
+      {/* New Guest Dialog */}
+      <NewGuestDialog
+        open={showNewDialog}
+        onOpenChange={setShowNewDialog}
+        onSuccess={(guest) => {
+          setShowNewDialog(false)
+          toast.success(`Client ${guest.firstName} ${guest.lastName} créé avec succès`)
+        }}
+      />
     </div>
   )
 }

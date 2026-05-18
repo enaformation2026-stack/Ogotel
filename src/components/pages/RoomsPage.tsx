@@ -33,6 +33,9 @@ import {
   Building2,
   Banknote,
 } from 'lucide-react'
+import { NewRoomDialog } from '@/components/dialogs/NewRoomDialog'
+import { UpdateRoomStatusDialog } from '@/components/dialogs/UpdateRoomStatusDialog'
+import { toast } from 'sonner'
 
 // ==========================================
 // STATUS CONFIGURATION
@@ -96,6 +99,18 @@ interface FilterTab {
 export function RoomsPage() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showNewRoomDialog, setShowNewRoomDialog] = useState(false)
+  const [showStatusDialog, setShowStatusDialog] = useState(false)
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
+
+  const handleStatusChange = (room: Room) => {
+    setSelectedRoom(room)
+    setShowStatusDialog(true)
+  }
+
+  const handleEditRoom = (room: Room) => {
+    toast.info(`Modification de la chambre ${room.number} — fonctionnalité à venir`)
+  }
 
   // Compute status counts from mock data
   const statusCounts = useMemo(() => {
@@ -151,7 +166,7 @@ export function RoomsPage() {
           </Badge>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Button variant="outline" disabled className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setShowNewRoomDialog(true)}>
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Ajouter une chambre</span>
             <span className="sm:hidden">Ajouter</span>
@@ -207,7 +222,7 @@ export function RoomsPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {filteredRooms.map((room) => (
-            <RoomCard key={room.id} room={room} />
+            <RoomCard key={room.id} room={room} onStatusChange={handleStatusChange} onEdit={handleEditRoom} />
           ))}
         </div>
       )}
@@ -250,6 +265,25 @@ export function RoomsPage() {
           />
         </div>
       </Card>
+
+      {/* New Room Dialog */}
+      <NewRoomDialog
+        open={showNewRoomDialog}
+        onOpenChange={setShowNewRoomDialog}
+        onSuccess={() => setShowNewRoomDialog(false)}
+        hotelId="hotel-1"
+      />
+
+      {/* Update Room Status Dialog */}
+      <UpdateRoomStatusDialog
+        open={showStatusDialog}
+        onOpenChange={setShowStatusDialog}
+        room={selectedRoom}
+        onSuccess={() => {
+          setShowStatusDialog(false)
+          setSelectedRoom(null)
+        }}
+      />
     </div>
   )
 }
@@ -258,7 +292,7 @@ export function RoomsPage() {
 // ROOM CARD COMPONENT
 // ==========================================
 
-function RoomCard({ room }: { room: Room }) {
+function RoomCard({ room, onStatusChange, onEdit }: { room: Room; onStatusChange: (room: Room) => void; onEdit: (room: Room) => void }) {
   const config = STATUS_CONFIG[room.status]
   const StatusIcon = config.icon
   const price = room.priceOverride ?? room.roomType?.basePrice ?? 0
@@ -282,7 +316,7 @@ function RoomCard({ room }: { room: Room }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem className="gap-2" onSelect={() => onEdit(room)}>
               <Pencil className="h-4 w-4" />
               Modifier
             </DropdownMenuItem>
@@ -296,7 +330,7 @@ function RoomCard({ room }: { room: Room }) {
                   const sConfig = STATUS_CONFIG[status]
                   const SIcon = sConfig.icon
                   return (
-                    <DropdownMenuItem key={status} className="gap-2">
+                    <DropdownMenuItem key={status} className="gap-2" onSelect={() => onStatusChange(room)}>
                       <SIcon className="h-4 w-4" />
                       {sConfig.label}
                     </DropdownMenuItem>
