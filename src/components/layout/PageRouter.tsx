@@ -12,6 +12,7 @@ import { PaymentsPage } from '@/components/pages/PaymentsPage'
 import { ReportsPage } from '@/components/pages/ReportsPage'
 import { StaffPage } from '@/components/pages/StaffPage'
 import { HotelsPage } from '@/components/pages/HotelsPage'
+import { RoomTypesPage } from '@/components/pages/RoomTypesPage'
 import { SettingsPage } from '@/components/pages/SettingsPage'
 
 // Mapping page -> composant
@@ -20,7 +21,7 @@ const PAGE_COMPONENTS: Record<ActivePage, React.ComponentType> = {
   hotels: HotelsPage,
   reservations: ReservationsPage,
   rooms: RoomsPage,
-  'room-types': RoomsPage,
+  'room-types': RoomTypesPage,
   guests: GuestsPage,
   payments: PaymentsPage,
   reports: ReportsPage,

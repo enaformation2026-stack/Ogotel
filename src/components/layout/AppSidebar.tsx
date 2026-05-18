@@ -12,6 +12,7 @@ import {
   UserCog,
   Settings,
   Crown,
+  Layers,
 } from 'lucide-react'
 
 import {
@@ -50,6 +51,7 @@ const MAIN_NAV: NavItem[] = [
   { title: 'Mes Hôtels', page: 'hotels', icon: Building2 },
   { title: 'Réservations', page: 'reservations', icon: CalendarDays },
   { title: 'Chambres', page: 'rooms', icon: BedDouble },
+  { title: 'Types de Chambres', page: 'room-types', icon: Layers },
   { title: 'Clients', page: 'guests', icon: Users },
   { title: 'Paiements', page: 'payments', icon: CreditCard },
 ]

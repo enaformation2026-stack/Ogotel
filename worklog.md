@@ -311,3 +311,108 @@ Stage Summary:
 - `src/components/onboarding/OnboardingWizard.tsx` created (~1100 lines)
 - Importable in page.tsx via `<OnboardingWizard showOnboarding={...} onComplete={...} onSkip={...} />`
 - Zero ESLint errors, zero new TypeScript errors
+
+---
+Task ID: 3-c
+Agent: fullstack-developer
+Task: Build Room Types API routes
+
+Work Log:
+- Created `src/app/api/room-types/route.ts` with GET and POST handlers
+  - GET: requires `hotelId` query param (400 if missing); optional `search` (filters by name contains) and `active` (boolean) filters; includes `_count` for active rooms; returns `{ roomTypes: [...] }`
+  - POST: Zod-validated body (hotelId required, name required, basePrice required, maxOccupancy required, description/bedCount/bedType/amenities optional); resolves `organizationId` from the hotel record; amenities array stored as JSON string; defaults bedCount=1, isActive=true; returns 201 with created room type
+- Created `src/app/api/room-types/[id]/route.ts` with GET, PUT, and DELETE handlers
+  - GET: returns single room type with `_count` for rooms; 404 if not found
+  - PUT: whitelist-based partial update (name, description, basePrice, maxOccupancy, bedCount, bedType, amenities, isActive); amenities auto-stringified if array provided; 404 if not found
+  - DELETE: soft delete (sets isActive=false); guards against deletion if any rooms of this type are currently occupied (status=occupied, isActive=true); returns 409 with French message if blocked; returns `{ success: true }`
+- All routes use Next.js 16 params pattern (`params: Promise<{ id: string }>`), `import { db } from '@/lib/db'`, try/catch error handling, French error messages
+- ESLint: 0 errors on both new files
+
+Stage Summary:
+- `src/app/api/room-types/route.ts` — GET (list with hotelId/search/active filters + _count) + POST (Zod validation, auto-resolve org from hotel, amenities as JSON string)
+- `src/app/api/room-types/[id]/route.ts` — GET (detail with _count) + PUT (whitelist partial update, amenities stringify) + DELETE (soft delete with occupied-room guard)
+- Full CRUD REST API for room types: list, create, read, update, soft-delete
+
+---
+Task ID: 3-b
+Agent: fullstack-developer
+Task: Build EditRoomDialog + enhance rooms API
+
+Work Log:
+- Created `src/components/dialogs/EditRoomDialog.tsx` — dialog for editing existing rooms
+  - Props: `{ open, onOpenChange, onSuccess, room: Room | null }`
+  - Fields: room number (required), floor, room type (select with API fetch + mock fallback), name (optional), price override (optional number), maintenance notes (textarea, shown only when status=maintenance)
+  - Pre-fills all fields from room data via useEffect on open/room change
+  - Shows selected room type info card (same as NewRoomDialog)
+  - Calls PATCH /api/rooms/[id] with all editable fields
+  - Mock fallback: updates local MOCK_ROOMS array with toast.warning for offline mode
+  - Toast success/error notifications, Loader2 spinner while submitting
+  - Pencil icon in title, brand green submit button, French UI throughout
+- Rewrote `src/app/api/rooms/[id]/route.ts` with enhanced PATCH, GET, and DELETE handlers
+  - GET: returns single room with roomType included, 404 if not found
+  - PATCH: whitelist-based partial update supporting 8 fields (status, maintenanceNotes, number, floor, name, roomTypeId, priceOverride, isActive); status validation; room number uniqueness check within hotel; room type existence verification; preserves lastCleanedAt logic (auto-set when becoming available); clears maintenance notes when leaving maintenance status
+  - DELETE: soft delete (sets isActive=false), returns `{ success: true }`; guards against deletion if room has active reservations (status=checked_in or confirmed), returns 409 with French message
+- Zero TypeScript errors on new/modified files, zero ESLint errors
+
+Stage Summary:
+- `src/components/dialogs/EditRoomDialog.tsx` created — full edit form with pre-fill, type info card, mock fallback
+- `src/app/api/rooms/[id]/route.ts` rewritten — GET (detail) + PATCH (8 editable fields) + DELETE (soft delete with active reservation guard)
+- Next step: wire EditRoomDialog into RoomsPage (replace toast.info placeholder in handleEditRoom)
+
+---
+Task ID: 3-a
+Agent: fullstack-developer
+Task: Build RoomTypesPage + NewRoomTypeDialog + EditRoomTypeDialog
+
+Work Log:
+- Created `src/components/pages/RoomTypesPage.tsx` — comprehensive room types management page
+  - Header: "Types de Chambres" title with count badge + "Ajouter un type" primary button (brand green)
+  - Search bar filtering by name and description
+  - Desktop table (lg+): 6 columns — Nom (name + description snippet), Prix (formatFCFA), Capacité (maxOccupancy + bedCount + bedType badge), Chambres (room count), Statut (Active/Inactive badge), Actions dropdown (Edit, Toggle active, Delete)
+  - Mobile card view (< lg): responsive card grid (1/2 cols) with same data, amenity badges, compact stats boxes (Prix, Capacité, Chambres)
+  - Stats summary card: total types, average price, total rooms, cheapest type + price, most expensive type + price
+  - Empty state with BedDouble icon and CTA button when no room types exist
+  - Delete confirmation AlertDialog with amber warning when rooms exist for that type
+  - Toggle active/inactive status managed locally
+  - Framer Motion entrance animations: container staggerChildren for cards, row fade-in-up for table rows
+  - RoomTypeWithMeta local interface extending RoomType with _isActive and _roomCount
+  - Room counts computed from MOCK_ROOMS
+  - Delete calls DELETE /api/room-types/[id] with offline fallback
+- Created `src/components/dialogs/NewRoomTypeDialog.tsx` — create dialog
+  - 8 form fields: Nom (required text), Description (textarea), Prix de base (required number, FCFA), Capacité max (required number, 1-10), Nombre de lits (select 1-5), Type de lit (select: Simple/Double/Queen/King/Jumeaux), Équipements (8 checkbox items with icons in 2×4 grid)
+  - Client-side validation: name required, price > 0, capacity 1-10
+  - Calls POST /api/room-types with mock fallback
+  - Form auto-resets on dialog open via useEffect
+  - Amenity checkboxes as styled labels with icon + text + checked highlight
+  - Brand green submit button, Loader2 spinner, French UI
+- Created `src/components/dialogs/EditRoomTypeDialog.tsx` — edit dialog
+  - Same 8 fields as NewRoomTypeDialog, pre-filled from existing RoomType data
+  - useEffect watches open + roomType to reset form fields
+  - Calls PUT /api/room-types/[id] with offline fallback
+  - Pencil icon in title, "Enregistrer" submit button
+- Fixed `Bathtub` → `Bath` (correct lucide-react export name) in all 3 files
+- All 3 files: zero TypeScript errors, zero ESLint errors
+
+Stage Summary:
+- `src/components/pages/RoomTypesPage.tsx` created — responsive table/cards, search, stats, CRUD actions, animations
+- `src/components/dialogs/NewRoomTypeDialog.tsx` created — full form with validation, amenities checkboxes
+- `src/components/dialogs/EditRoomTypeDialog.tsx` created — pre-filled edit form with auto-reset
+- Next step: wire RoomTypesPage into sidebar nav and PageRouter
+
+---
+Task ID: 3-d
+Agent: fullstack-developer
+Task: Wire RoomTypesPage, EditRoomDialog into the app
+
+Work Log:
+- Verified `'room-types'` already present in `ActivePage` type union in `src/stores/ui.store.ts` (no change needed)
+- Updated `src/components/layout/PageRouter.tsx`: imported `RoomTypesPage`, fixed `'room-types'` mapping from `RoomsPage` → `RoomTypesPage`
+- Updated `src/components/layout/AppSidebar.tsx`: imported `Layers` icon from lucide-react, added `{ title: 'Types de Chambres', page: 'room-types', icon: Layers }` after "Chambres" in `MAIN_NAV`
+- Updated `src/components/pages/RoomsPage.tsx`: imported `EditRoomDialog`, added `showEditDialog`/`setShowEditDialog` and `selectedEditRoom`/`setSelectedEditRoom` state, replaced `handleEditRoom` toast placeholder with dialog open logic, rendered `<EditRoomDialog>` with proper props (open, onOpenChange, room, onSuccess)
+- Verified `src/components/pages/RoomTypesPage.tsx` already imports and renders `NewRoomTypeDialog` and `EditRoomTypeDialog` correctly (no change needed)
+- ESLint: 0 errors on all modified files
+
+Stage Summary:
+- RoomTypesPage fully wired: sidebar nav entry, PageRouter mapping, dialogs connected
+- EditRoomDialog fully wired in RoomsPage: "Modifier" action now opens the edit dialog
+- All navigation and CRUD flows for room types operational

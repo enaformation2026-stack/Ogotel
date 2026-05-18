@@ -35,6 +35,7 @@ import {
 } from 'lucide-react'
 import { NewRoomDialog } from '@/components/dialogs/NewRoomDialog'
 import { UpdateRoomStatusDialog } from '@/components/dialogs/UpdateRoomStatusDialog'
+import { EditRoomDialog } from '@/components/dialogs/EditRoomDialog'
 import { toast } from 'sonner'
 
 // ==========================================
@@ -101,7 +102,9 @@ export function RoomsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showNewRoomDialog, setShowNewRoomDialog] = useState(false)
   const [showStatusDialog, setShowStatusDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
+  const [selectedEditRoom, setSelectedEditRoom] = useState<Room | null>(null)
 
   const handleStatusChange = (room: Room) => {
     setSelectedRoom(room)
@@ -109,7 +112,8 @@ export function RoomsPage() {
   }
 
   const handleEditRoom = (room: Room) => {
-    toast.info(`Modification de la chambre ${room.number} — fonctionnalité à venir`)
+    setSelectedEditRoom(room)
+    setShowEditDialog(true)
   }
 
   // Compute status counts from mock data
@@ -272,6 +276,21 @@ export function RoomsPage() {
         onOpenChange={setShowNewRoomDialog}
         onSuccess={() => setShowNewRoomDialog(false)}
         hotelId="hotel-1"
+      />
+
+      {/* Edit Room Dialog */}
+      <EditRoomDialog
+        open={showEditDialog}
+        onOpenChange={(open) => {
+          setShowEditDialog(open)
+          if (!open) setSelectedEditRoom(null)
+        }}
+        room={selectedEditRoom}
+        onSuccess={() => {
+          setShowEditDialog(false)
+          setSelectedEditRoom(null)
+          toast.success('Chambre modifiée avec succès')
+        }}
       />
 
       {/* Update Room Status Dialog */}
