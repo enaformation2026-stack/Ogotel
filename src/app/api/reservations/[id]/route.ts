@@ -289,7 +289,7 @@ export async function PATCH(
       updateData.nights = newNights
       const subtotal = (parsed.data.roomRate ?? reservation.roomRate) * newNights
       updateData.subtotal = subtotal
-      updateData.totalAmount = subtotal + (reservation.taxAmount || 0) - (parsed.data.discountAmount ?? reservation.discountAmount || 0)
+      updateData.totalAmount = subtotal + (reservation.taxAmount || 0) - ((parsed.data.discountAmount ?? reservation.discountAmount) || 0)
       updateData.balanceDue = updateData.totalAmount - reservation.paidAmount
     }
 

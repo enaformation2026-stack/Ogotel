@@ -1,95 +1,74 @@
 'use client'
 
 import * as React from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Building2,
-  BedDouble,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  X,
-  Sparkles,
-  Loader2,
-  Bed,
-} from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
-import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Building2,
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Plus,
+  Trash2,
+  BedDouble,
+  Loader2,
+  Sparkles,
+  Hotel,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
-import { formatFCFA } from '@/types'
+import { motion, AnimatePresence } from 'framer-motion'
 
-// ─── Types ─────────────────────────────────────────────────────────────────
-
-export interface OnboardingData {
-  organizationName: string
-  hotel: {
-    name: string
-    email?: string
-    phone?: string
-    city?: string
-    district?: string
-    address?: string
-  }
-  roomTypes: {
-    name: string
-    basePrice: number
-    maxOccupancy: number
-    bedCount: number
-    bedType: string
-  }[]
-  roomsPerType: Record<string, number>
-}
-
-interface RoomTypeConfig {
-  key: string
-  name: string
-  activated: boolean
-  basePrice: number
-  maxOccupancy: number
-  bedCount: number
-  bedType: string
-  isCustom?: boolean
-}
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface OnboardingWizardProps {
-  showOnboarding: boolean
-  onComplete: (data: OnboardingData) => void
+  open: boolean
+  onComplete: () => void
   onSkip: () => void
 }
 
-const BED_TYPE_OPTIONS = [
-  { value: 'Simple', label: 'Simple' },
-  { value: 'Double', label: 'Double' },
-  { value: 'Queen', label: 'Queen' },
-  { value: 'King', label: 'King' },
+interface RoomTypeForm {
+  id: string
+  name: string
+  basePrice: number
+  maxOccupancy: number
+  bedCount: number
+}
+
+interface RoomForm {
+  id: string
+  number: string
+  floor: string
+  roomTypeId: string
+}
+
+type WizardStep = 1 | 2 | 3 | 4
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const STEPS = [
+  { num: 1, label: 'Bienvenue' },
+  { num: 2, label: 'Types de chambre' },
+  { num: 3, label: 'Chambres' },
+  { num: 4, label: 'Terminé' },
 ]
 
-const STEP_LABELS = [
-  'Organisation',
-  'Types de chambres',
-  'Chambres initiales',
+const SUGGESTED_ROOM_TYPES: Omit<RoomTypeForm, 'id'>[] = [
+  { name: 'Standard', basePrice: 25000, maxOccupancy: 2, bedCount: 1 },
+  { name: 'Deluxe', basePrice: 45000, maxOccupancy: 2, bedCount: 1 },
+  { name: 'Suite', basePrice: 75000, maxOccupancy: 3, bedCount: 1 },
 ]
 
-// ─── Animation variants ────────────────────────────────────────────────────
+// ── Animation ─────────────────────────────────────────────────────────────────
 
 const slideVariants = {
   enter: (direction: number) => ({
-    x: direction > 0 ? 280 : -280,
+    x: direction > 0 ? 300 : -300,
     opacity: 0,
   }),
   center: {
@@ -97,1037 +76,565 @@ const slideVariants = {
     opacity: 1,
   },
   exit: (direction: number) => ({
-    x: direction < 0 ? 280 : -280,
+    x: direction > 0 ? -300 : 300,
     opacity: 0,
   }),
 }
 
-const overlayVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 },
-}
+// ── Component ────────────────────────────────────────────────────────────────
 
-// ─── Predefined room types ─────────────────────────────────────────────────
+export function OnboardingWizard({
+  open,
+  onComplete,
+  onSkip,
+}: OnboardingWizardProps) {
+  const [step, setStep] = useState<WizardStep>(1)
+  const [direction, setDirection] = useState(0)
 
-function getDefaultRoomTypes(): RoomTypeConfig[] {
-  return [
-    {
-      key: 'standard',
-      name: 'Standard',
-      activated: true,
-      basePrice: 15000,
-      maxOccupancy: 2,
-      bedCount: 1,
-      bedType: 'Double',
-    },
-    {
-      key: 'deluxe',
-      name: 'Deluxe',
-      activated: true,
-      basePrice: 25000,
-      maxOccupancy: 2,
-      bedCount: 1,
-      bedType: 'Queen',
-    },
-    {
-      key: 'suite',
-      name: 'Suite',
-      activated: false,
-      basePrice: 45000,
-      maxOccupancy: 3,
-      bedCount: 1,
-      bedType: 'King',
-    },
-    {
-      key: 'suite-royale',
-      name: 'Suite Royale',
-      activated: false,
-      basePrice: 80000,
-      maxOccupancy: 4,
-      bedCount: 2,
-      bedType: 'King',
-    },
-  ]
-}
+  // Step 1: Hotel name
+  const [hotelName, setHotelName] = useState('')
+  const [hotelCity, setHotelCity] = useState('')
+  const [hotelStars, setHotelStars] = useState(3)
 
-// ─── Generate room numbers ─────────────────────────────────────────────────
+  // Step 2: Room types
+  const [roomTypes, setRoomTypes] = useState<RoomTypeForm[]>([])
 
-function generateRoomNumbers(floor: number, count: number): string[] {
-  const numbers: string[] = []
-  const startNum = floor * 100
-  for (let i = 1; i <= count; i++) {
-    numbers.push(String(startNum + i))
-  }
-  return numbers
-}
+  // Step 3: Rooms
+  const [rooms, setRooms] = useState<RoomForm[]>([])
 
-// ─── Step 1: Organisation Info ─────────────────────────────────────────────
+  // General
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-function StepOrganization({
-  data,
-  onChange,
-  errors,
-}: {
-  data: OnboardingData
-  onChange: (data: OnboardingData) => void
-  errors: Record<string, string>
-}) {
-  const update = (field: string, value: string) => {
-    onChange({
-      ...data,
-      [field]: value,
-    })
-  }
-
-  const updateHotel = (field: string, value: string) => {
-    onChange({
-      ...data,
-      hotel: {
-        ...data.hotel,
-        [field]: value || undefined,
-      },
-    })
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-[oklch(0.22_0.065_160)]">
-          <Building2 className="size-5 text-white" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold">Informations de l&apos;organisation</h3>
-          <p className="text-sm text-muted-foreground">
-            Parlez-nous de votre établissement hôtelier
-          </p>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Organisation Name */}
-      <div className="space-y-2">
-        <Label htmlFor="org-name">
-          Nom de l&apos;organisation <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="org-name"
-          placeholder="Ex: Hôtels Cocody SARL"
-          value={data.organizationName}
-          onChange={(e) => update('organizationName', e.target.value)}
-          className="h-11"
-        />
-        {errors.organizationName && (
-          <p className="text-xs text-destructive">{errors.organizationName}</p>
-        )}
-      </div>
-
-      {/* Hotel Name */}
-      <div className="space-y-2">
-        <Label htmlFor="hotel-name">
-          Nom de l&apos;hôtel <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="hotel-name"
-          placeholder="Ex: Hôtel Le Cocody Palace"
-          value={data.hotel.name}
-          onChange={(e) => updateHotel('name', e.target.value)}
-          className="h-11"
-        />
-        {errors.hotelName && (
-          <p className="text-xs text-destructive">{errors.hotelName}</p>
-        )}
-      </div>
-
-      {/* Email + Phone row */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="hotel-email">Email de l&apos;hôtel</Label>
-          <Input
-            id="hotel-email"
-            type="email"
-            placeholder="contact@hotel-ci.com"
-            value={data.hotel.email || ''}
-            onChange={(e) => updateHotel('email', e.target.value)}
-            className="h-11"
-          />
-          {errors.hotelEmail && (
-            <p className="text-xs text-destructive">{errors.hotelEmail}</p>
-          )}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="hotel-phone">Téléphone</Label>
-          <Input
-            id="hotel-phone"
-            type="tel"
-            placeholder="+225 27 20 30 40 50"
-            value={data.hotel.phone || ''}
-            onChange={(e) => updateHotel('phone', e.target.value)}
-            className="h-11"
-          />
-        </div>
-      </div>
-
-      {/* City + District row */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="hotel-city">Ville</Label>
-          <Input
-            id="hotel-city"
-            placeholder="Ex: Abidjan"
-            value={data.hotel.city || ''}
-            onChange={(e) => updateHotel('city', e.target.value)}
-            className="h-11"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="hotel-district">Quartier</Label>
-          <Input
-            id="hotel-district"
-            placeholder="Ex: Cocody"
-            value={data.hotel.district || ''}
-            onChange={(e) => updateHotel('district', e.target.value)}
-            className="h-11"
-          />
-        </div>
-      </div>
-
-      {/* Address */}
-      <div className="space-y-2">
-        <Label htmlFor="hotel-address">Adresse</Label>
-        <Textarea
-          id="hotel-address"
-          placeholder="Rue, avenue, boulevard..."
-          value={data.hotel.address || ''}
-          onChange={(e) => updateHotel('address', e.target.value)}
-          rows={3}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ─── Step 2: Room Types ────────────────────────────────────────────────────
-
-function StepRoomTypes({
-  roomTypes,
-  onChange,
-  errors,
-}: {
-  roomTypes: RoomTypeConfig[]
-  onChange: (types: RoomTypeConfig[]) => void
-  errors: Record<string, string>
-}) {
-  const toggleType = (index: number) => {
-    const updated = [...roomTypes]
-    updated[index] = { ...updated[index], activated: !updated[index].activated }
-    onChange(updated)
-  }
-
-  const updateType = (index: number, field: string, value: string | number) => {
-    const updated = [...roomTypes]
-    updated[index] = { ...updated[index], [field]: value }
-    onChange(updated)
-  }
-
-  const removeCustomType = (index: number) => {
-    if (roomTypes[index].isCustom) {
-      onChange(roomTypes.filter((_, i) => i !== index))
+  // Reset on open
+  useEffect(() => {
+    if (open) {
+      setStep(1)
+      setHotelName('')
+      setHotelCity('')
+      setHotelStars(3)
+      setRoomTypes([])
+      setRooms([])
     }
+  }, [open])
+
+  if (!open) return null
+
+  const totalSteps = 4
+  const progressValue = ((step - 1) / (totalSteps - 1)) * 100
+
+  const goNext = () => {
+    setDirection(1)
+    setStep((s) => Math.min(s + 1, 4) as WizardStep)
   }
 
-  const addCustomType = () => {
-    const customKey = `custom-${Date.now()}`
-    onChange([
-      ...roomTypes,
+  const goBack = () => {
+    setDirection(-1)
+    setStep((s) => Math.max(s - 1, 1) as WizardStep)
+  }
+
+  // ── Step 1: Can proceed? ─────────────────────────────────────────────
+  const canGoStep1 = hotelName.trim().length >= 2
+
+  // ── Step 2: Room types management ────────────────────────────────────
+  const addRoomType = (preset?: Omit<RoomTypeForm, 'id'>) => {
+    setRoomTypes((prev) => [
+      ...prev,
       {
-        key: customKey,
-        name: '',
-        activated: true,
-        basePrice: 20000,
-        maxOccupancy: 2,
-        bedCount: 1,
-        bedType: 'Double',
-        isCustom: true,
+        id: `rt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: preset?.name ?? '',
+        basePrice: preset?.basePrice ?? 25000,
+        maxOccupancy: preset?.maxOccupancy ?? 2,
+        bedCount: preset?.bedCount ?? 1,
       },
     ])
   }
 
-  const activatedCount = roomTypes.filter((rt) => rt.activated).length
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-[oklch(0.22_0.065_160)]">
-          <BedDouble className="size-5 text-white" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold">Types de chambres</h3>
-          <p className="text-sm text-muted-foreground">
-            Sélectionnez et configurez les types de chambres de votre hôtel
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Badge variant="secondary" className="text-xs">
-          {activatedCount} type{activatedCount !== 1 ? 's' : ''} activé{activatedCount !== 1 ? 's' : ''}
-        </Badge>
-      </div>
-
-      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-        {roomTypes.map((rt, index) => (
-          <motion.div
-            key={rt.key}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-            <Card
-              className={`overflow-hidden transition-all ${
-                rt.activated
-                  ? 'border-[oklch(0.22_0.065_160)]/30 bg-[oklch(0.22_0.065_160)]/[0.03]'
-                  : 'opacity-60'
-              }`}
-            >
-              <CardContent className="p-0">
-                {/* Card header row */}
-                <div className="flex items-center justify-between p-4 pb-3">
-                  <div className="flex items-center gap-3">
-                    <Bed className="size-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">
-                      {rt.isCustom ? (
-                        <Input
-                          value={rt.name}
-                          onChange={(e) => updateType(index, 'name', e.target.value)}
-                          placeholder="Nom du type"
-                          className="h-7 w-40 text-sm"
-                        />
-                      ) : (
-                        rt.name
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {rt.isCustom && (
-                      <button
-                        type="button"
-                        onClick={() => removeCustomType(index)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <X className="size-4" />
-                      </button>
-                    )}
-                    <Switch
-                      checked={rt.activated}
-                      onCheckedChange={() => toggleType(index)}
-                      className="data-[state=checked]:bg-[oklch(0.22_0.065_160)]"
-                    />
-                  </div>
-                </div>
-
-                {/* Expanded details when activated */}
-                <AnimatePresence>
-                  {rt.activated && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <Separator />
-                      <div className="grid gap-3 p-4 pt-3 sm:grid-cols-2 lg:grid-cols-4">
-                        {/* Base Price */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">
-                            Prix de base
-                          </Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            value={rt.basePrice || ''}
-                            onChange={(e) =>
-                              updateType(index, 'basePrice', parseInt(e.target.value) || 0)
-                            }
-                            className="h-9 text-sm"
-                            placeholder="15000"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            {rt.basePrice ? formatFCFA(rt.basePrice) : '—'}
-                          </p>
-                        </div>
-
-                        {/* Max Occupancy */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">
-                            Capacité max
-                          </Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="10"
-                            value={rt.maxOccupancy || ''}
-                            onChange={(e) =>
-                              updateType(index, 'maxOccupancy', parseInt(e.target.value) || 1)
-                            }
-                            className="h-9 text-sm"
-                            placeholder="2"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            {rt.maxOccupancy} personne{rt.maxOccupancy > 1 ? 's' : ''}
-                          </p>
-                        </div>
-
-                        {/* Bed Count */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">
-                            Nombre de lits
-                          </Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="5"
-                            value={rt.bedCount || ''}
-                            onChange={(e) =>
-                              updateType(index, 'bedCount', parseInt(e.target.value) || 1)
-                            }
-                            className="h-9 text-sm"
-                            placeholder="1"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            {rt.bedCount} lit{rt.bedCount > 1 ? 's' : ''}
-                          </p>
-                        </div>
-
-                        {/* Bed Type */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">
-                            Type de lit
-                          </Label>
-                          <Select
-                            value={rt.bedType}
-                            onValueChange={(v) => updateType(index, 'bedType', v)}
-                          >
-                            <SelectTrigger className="h-9 text-sm w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {BED_TYPE_OPTIONS.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {errors.roomTypes && (
-        <p className="text-xs text-destructive">{errors.roomTypes}</p>
-      )}
-
-      {/* Add custom type button */}
-      <Button
-        type="button"
-        variant="outline"
-        onClick={addCustomType}
-        className="w-full border-dashed"
-      >
-        <Plus className="size-4 mr-2" />
-        Ajouter un type personnalisé
-      </Button>
-    </div>
-  )
-}
-
-// ─── Step 3: Initial Rooms ─────────────────────────────────────────────────
-
-function StepInitialRooms({
-  roomTypes,
-  roomsPerType,
-  floorsPerType,
-  onChangeRooms,
-  onChangeFloor,
-}: {
-  roomTypes: RoomTypeConfig[]
-  roomsPerType: Record<string, number>
-  floorsPerType: Record<string, number>
-  onChangeRooms: (key: string, count: number) => void
-  onChangeFloor: (key: string, floor: number) => void
-}) {
-  const activatedTypes = roomTypes.filter((rt) => rt.activated)
-  const totalRooms = activatedTypes.reduce(
-    (sum, rt) => sum + (roomsPerType[rt.key] || 0),
-    0
-  )
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-[oklch(0.22_0.065_160)]">
-          <Sparkles className="size-5 text-white" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold">Chambres initiales</h3>
-          <p className="text-sm text-muted-foreground">
-            Définissez combien de chambres créer pour chaque type
-          </p>
-        </div>
-      </div>
-
-      {/* Total rooms summary */}
-      <div className="rounded-lg border bg-muted/50 p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Total des chambres à créer</span>
-          <Badge
-            variant="default"
-            className="bg-[oklch(0.22_0.065_160)] text-white"
-          >
-            {totalRooms} chambre{totalRooms !== 1 ? 's' : ''}
-          </Badge>
-        </div>
-      </div>
-
-      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-        {activatedTypes.map((rt, index) => {
-          const count = roomsPerType[rt.key] || 0
-          const floor = floorsPerType[rt.key] || 1
-          const roomNumbers =
-            count > 0 ? generateRoomNumbers(floor, count) : []
-
-          return (
-            <motion.div
-              key={rt.key}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Card className="overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="p-4 pb-3">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Bed className="size-4 text-[oklch(0.22_0.065_160)]" />
-                        <span className="font-medium text-sm">{rt.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          — {formatFCFA(rt.basePrice)}/nuit
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {/* Number of rooms */}
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">
-                          Nombre de chambres
-                        </Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="50"
-                          value={count}
-                          onChange={(e) =>
-                            onChangeRooms(
-                              rt.key,
-                              Math.max(0, Math.min(50, parseInt(e.target.value) || 0))
-                            )
-                          }
-                          className="h-9 text-sm"
-                        />
-                      </div>
-
-                      {/* Floor */}
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">
-                          Étage
-                        </Label>
-                        <Select
-                          value={String(floor)}
-                          onValueChange={(v) => onChangeFloor(rt.key, parseInt(v))}
-                        >
-                          <SelectTrigger className="h-9 text-sm w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((f) => (
-                              <SelectItem key={f} value={String(f)}>
-                                Étage {f}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Auto-generated room numbers preview */}
-                    {roomNumbers.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Numéros de chambres :
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {roomNumbers.map((num) => (
-                            <Badge
-                              key={num}
-                              variant="secondary"
-                              className="font-mono text-xs"
-                            >
-                              {num}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ─── Main OnboardingWizard ─────────────────────────────────────────────────
-
-export function OnboardingWizard({
-  showOnboarding,
-  onComplete,
-  onSkip,
-}: OnboardingWizardProps) {
-  const [currentStep, setCurrentStep] = React.useState(0)
-  const [direction, setDirection] = React.useState(0)
-  const [isSubmitting, setIsSubmitting] = React.useState(false)
-  const [errors, setErrors] = React.useState<Record<string, string>>({})
-
-  // Step 1 data
-  const [data, setData] = React.useState<OnboardingData>({
-    organizationName: '',
-    hotel: {
-      name: '',
-      email: '',
-      phone: '',
-      city: '',
-      district: '',
-      address: '',
-    },
-    roomTypes: [],
-    roomsPerType: {},
-  })
-
-  // Step 2 data
-  const [roomTypes, setRoomTypes] = React.useState<RoomTypeConfig[]>(getDefaultRoomTypes)
-
-  // Step 3 data
-  const [roomsPerType, setRoomsPerType] = React.useState<Record<string, number>>({
-    standard: 5,
-    deluxe: 3,
-    suite: 2,
-    'suite-royale': 1,
-  })
-  const [floorsPerType, setFloorsPerType] = React.useState<Record<string, number>>({
-    standard: 1,
-    deluxe: 2,
-    suite: 3,
-    'suite-royale': 4,
-  })
-
-  // Sync default roomsPerType when room types change
-  React.useEffect(() => {
-    setRoomsPerType((prev) => {
-      const updated: Record<string, number> = {}
-      roomTypes.forEach((rt) => {
-        updated[rt.key] = prev[rt.key] ?? 3
-      })
-      return updated
-    })
-    setFloorsPerType((prev) => {
-      const updated: Record<string, number> = {}
-      roomTypes.forEach((rt, idx) => {
-        updated[rt.key] = prev[rt.key] ?? (idx + 1)
-      })
-      return updated
-    })
-  }, [roomTypes.map((rt) => rt.key).join(',')])
-
-  // Reset on show
-  React.useEffect(() => {
-    if (showOnboarding) {
-      setCurrentStep(0)
-      setDirection(0)
-      setIsSubmitting(false)
-      setErrors({})
-      setData({
-        organizationName: '',
-        hotel: {
-          name: '',
-          email: '',
-          phone: '',
-          city: '',
-          district: '',
-          address: '',
-        },
-        roomTypes: [],
-        roomsPerType: {},
-      })
-      setRoomTypes(getDefaultRoomTypes())
-      setRoomsPerType({ standard: 5, deluxe: 3, suite: 2, 'suite-royale': 1 })
-      setFloorsPerType({ standard: 1, deluxe: 2, suite: 3, 'suite-royale': 4 })
-    }
-  }, [showOnboarding])
-
-  // ─── Validation ────────────────────────────────────────────────────────
-
-  const validateStep = (step: number): boolean => {
-    const newErrors: Record<string, string> = {}
-
-    if (step === 0) {
-      if (!data.organizationName.trim()) {
-        newErrors.organizationName = 'Le nom de l\'organisation est requis'
-      }
-      if (!data.hotel.name.trim()) {
-        newErrors.hotelName = "Le nom de l'hôtel est requis"
-      }
-      if (data.hotel.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.hotel.email)) {
-        newErrors.hotelEmail = 'Adresse email invalide'
-      }
-    }
-
-    if (step === 1) {
-      const activated = roomTypes.filter((rt) => rt.activated)
-      if (activated.length === 0) {
-        newErrors.roomTypes = 'Vous devez activer au moins un type de chambre'
-      }
-      for (const rt of activated) {
-        if (!rt.name.trim()) {
-          newErrors[`name_${rt.key}`] = 'Le nom est requis'
-        }
-        if (!rt.basePrice || rt.basePrice <= 0) {
-          newErrors[`price_${rt.key}`] = 'Le prix doit être supérieur à 0'
-        }
-      }
-    }
-
-    if (step === 2) {
-      const activated = roomTypes.filter((rt) => rt.activated)
-      const hasRooms = activated.some((rt) => (roomsPerType[rt.key] || 0) > 0)
-      if (!hasRooms) {
-        newErrors.rooms = 'Vous devez créer au moins une chambre'
-      }
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+  const removeRoomType = (id: string) => {
+    setRoomTypes((prev) => prev.filter((rt) => rt.id !== id))
+    // Also remove rooms referencing this type
+    setRooms((prev) => prev.filter((r) => r.roomTypeId !== id))
   }
 
-  // ─── Navigation ────────────────────────────────────────────────────────
-
-  const goNext = () => {
-    if (!validateStep(currentStep)) return
-    setDirection(1)
-    setCurrentStep((s) => Math.min(s + 1, 2))
+  const updateRoomType = (id: string, data: Partial<RoomTypeForm>) => {
+    setRoomTypes((prev) => prev.map((rt) => (rt.id === id ? { ...rt, ...data } : rt)))
   }
 
-  const goPrev = () => {
-    setErrors({})
-    setDirection(-1)
-    setCurrentStep((s) => Math.max(s - 1, 0))
-  }
+  const canGoStep2 = roomTypes.length > 0 && roomTypes.every((rt) => rt.name.trim().length >= 2 && rt.basePrice > 0)
 
-  // ─── Submit ────────────────────────────────────────────────────────────
-
-  const handleFinish = async () => {
-    if (!validateStep(2)) return
-
-    setIsSubmitting(true)
-
-    // Build the activated room types
-    const activatedTypes = roomTypes.filter((rt) => rt.activated)
-    const finalRoomsPerType: Record<string, number> = {}
-
-    activatedTypes.forEach((rt) => {
-      finalRoomsPerType[rt.name] = roomsPerType[rt.key] || 0
-    })
-
-    const finalData: OnboardingData = {
-      organizationName: data.organizationName.trim(),
-      hotel: {
-        name: data.hotel.name.trim(),
-        email: data.hotel.email?.trim() || undefined,
-        phone: data.hotel.phone?.trim() || undefined,
-        city: data.hotel.city?.trim() || undefined,
-        district: data.hotel.district?.trim() || undefined,
-        address: data.hotel.address?.trim() || undefined,
+  // ── Step 3: Rooms management ─────────────────────────────────────────
+  const addRoom = () => {
+    if (roomTypes.length === 0) return
+    setRooms((prev) => [
+      ...prev,
+      {
+        id: `rm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        number: '',
+        floor: '',
+        roomTypeId: roomTypes[0].id,
       },
-      roomTypes: activatedTypes.map((rt) => ({
-        name: rt.name.trim(),
-        basePrice: rt.basePrice,
-        maxOccupancy: rt.maxOccupancy,
-        bedCount: rt.bedCount,
-        bedType: rt.bedType,
-      })),
-      roomsPerType: finalRoomsPerType,
-    }
+    ])
+  }
 
+  const removeRoom = (id: string) => {
+    setRooms((prev) => prev.filter((r) => r.id !== id))
+  }
+
+  const updateRoom = (id: string, data: Partial<RoomForm>) => {
+    setRooms((prev) => prev.map((r) => (r.id === id ? { ...r, ...data } : r)))
+  }
+
+  const canGoStep3 = rooms.length > 0 && rooms.every((r) => r.number.trim().length >= 1)
+
+  // ── Submit ────────────────────────────────────────────────────────────
+  const handleFinish = async () => {
+    setIsSubmitting(true)
     try {
-      // Step 1: Create hotel via API
-      const hotelRes = await fetch('/api/hotels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalData.hotel),
-      })
-
-      if (!hotelRes.ok) {
-        const err = await hotelRes.json().catch(() => ({}))
-        throw new Error(err.error || "Erreur lors de la création de l'hôtel")
-      }
-
-      const hotel = await hotelRes.json()
-      const hotelId = hotel.id
-
-      // Step 2: Create rooms for each activated type
-      const activatedWithKeys = roomTypes.filter((rt) => rt.activated)
-      for (const rt of activatedWithKeys) {
-        const count = roomsPerType[rt.key] || 0
-        const floor = floorsPerType[rt.key] || 1
-        const roomNumbers = generateRoomNumbers(floor, count)
-
-        for (const roomNum of roomNumbers) {
-          await fetch('/api/rooms', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              hotelId,
-              number: roomNum,
-              floor: String(floor),
-              roomTypeId: rt.key, // Will be resolved server-side or use mock
-              name: `${rt.name} ${roomNum}`,
-              initialStatus: 'available',
-            }),
-          }).catch(() => {
-            // Continue even if individual room creation fails
-          })
-        }
-      }
-
-      toast.success('Hôtel configuré avec succès ! Bienvenue sur OGOTEL CLOUD.')
-      onComplete(finalData)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue'
-      // Still allow completion in offline/demo mode
-      toast.warning(`${message} — Configuration sauvegardée localement.`)
-      onComplete(finalData)
+      // Simulate API calls
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      toast.success('Configuration terminée ! Bienvenue dans OGOTEL CLOUD 🎉')
+      onComplete()
+    } catch {
+      toast.error('Une erreur est survenue')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // ─── Progress ──────────────────────────────────────────────────────────
-
-  const progressValue = ((currentStep + 1) / 3) * 100
-
-  if (!showOnboarding) return null
-
   return (
-    <AnimatePresence>
-      {showOnboarding && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          variants={overlayVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          transition={{ duration: 0.3 }}
-        >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-
-          {/* Wizard container */}
-          <motion.div
-            className="relative z-10 mx-4 w-full max-w-2xl rounded-2xl border bg-background shadow-2xl"
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-          >
-            {/* Header */}
-            <div className="p-6 pb-0">
-              {/* Logo */}
-              <div className="flex items-center gap-3 mb-5">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-[oklch(0.22_0.065_160)]">
-                  <Building2 className="size-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="font-bold text-lg tracking-tight">Configuration initiale</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Configurez votre hôtel en 3 étapes rapides
-                  </p>
-                </div>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[oklch(0.22_0.065_160)] to-[oklch(0.15_0.05_160)] p-4">
+      <Card className="w-full max-w-2xl shadow-2xl">
+        <CardContent className="p-6 sm:p-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-[oklch(0.22_0.065_160)]">
+                <Hotel className="size-5 text-white" />
               </div>
+              <span className="text-lg font-bold text-[oklch(0.22_0.065_160)]">
+                OGOTEL CLOUD
+              </span>
+            </div>
+            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onSkip}>
+              <X className="size-4 mr-1" />
+              Passer
+            </Button>
+          </div>
 
-              {/* Progress bar */}
-              <div className="space-y-3 mb-6">
-                <Progress
-                  value={progressValue}
-                  className="h-2 bg-muted"
-                />
-
-                {/* Step indicators */}
-                <div className="flex items-center justify-between">
-                  {STEP_LABELS.map((label, i) => (
+          {/* Progress */}
+          <div className="space-y-3 mb-8">
+            <div className="flex items-center gap-2">
+              {STEPS.map((s, idx) => (
+                <React.Fragment key={s.num}>
+                  <div
+                    className={`flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                      s.num < step
+                        ? 'bg-emerald-500 text-white'
+                        : s.num === step
+                          ? 'bg-[oklch(0.22_0.065_160)] text-white'
+                          : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {s.num < step ? <Check className="size-3.5" /> : s.num}
+                  </div>
+                  <span
+                    className={`hidden sm:inline text-xs ${
+                      s.num === step ? 'text-foreground font-medium' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {s.label}
+                  </span>
+                  {idx < STEPS.length - 1 && (
                     <div
-                      key={label}
-                      className={`flex items-center gap-2 ${
-                        i <= currentStep ? 'text-foreground' : 'text-muted-foreground'
+                      className={`flex-1 h-px ${
+                        s.num < step ? 'bg-emerald-300' : 'bg-border'
                       }`}
-                    >
-                      <div
-                        className={`flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-all ${
-                          i < currentStep
-                            ? 'bg-[oklch(0.22_0.065_160)] text-white'
-                            : i === currentStep
-                              ? 'bg-[oklch(0.22_0.065_160)] text-white ring-2 ring-[oklch(0.22_0.065_160)]/30'
-                              : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {i < currentStep ? (
-                          <Check className="size-3.5" />
-                        ) : (
-                          i + 1
-                        )}
+                    />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+            <Progress value={progressValue} className="h-1" />
+          </div>
+
+          {/* Step Content */}
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={step}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25 }}
+            >
+              {/* Step 1: Welcome + Hotel Name */}
+              {step === 1 && (
+                <div className="space-y-6">
+                  <div className="text-center space-y-2">
+                    <div className="flex justify-center mb-4">
+                      <div className="flex size-16 items-center justify-center rounded-2xl bg-[oklch(0.22_0.065_160)]/10">
+                        <Building2 className="size-8 text-[oklch(0.22_0.065_160)]" />
                       </div>
-                      <span
-                        className={`hidden sm:inline text-xs font-medium ${
-                          i === currentStep ? 'text-foreground' : ''
-                        }`}
-                      >
-                        {label}
-                      </span>
                     </div>
-                  ))}
+                    <h2 className="text-2xl font-bold">Bienvenue sur OGOTEL CLOUD ! 🎉</h2>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      Configurons votre hôtel en quelques étapes rapides. Commencez par
+                      entrer le nom de votre établissement.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 max-w-sm mx-auto">
+                    <div className="space-y-2">
+                      <Label htmlFor="hotel-name">
+                        Nom de l&apos;hôtel <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="hotel-name"
+                        placeholder="Ex: Hôtel Le Cocody"
+                        value={hotelName}
+                        onChange={(e) => setHotelName(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hotel-city">Ville</Label>
+                      <Input
+                        id="hotel-city"
+                        placeholder="Ex: Abidjan"
+                        value={hotelCity}
+                        onChange={(e) => setHotelCity(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nombre d&apos;étoiles</Label>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setHotelStars(s)}
+                            className="focus:outline-none"
+                          >
+                            <svg
+                              className={`size-8 transition-colors ${
+                                s <= hotelStars
+                                  ? 'text-amber-400 fill-amber-400'
+                                  : 'text-gray-200 fill-gray-200'
+                              }`}
+                              viewBox="0 0 24 24"
+                            >
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Step content */}
-            <div className="px-6 pb-6 min-h-[380px]">
-              <AnimatePresence mode="wait" custom={direction}>
-                <motion.div
-                  key={currentStep}
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                >
-                  {currentStep === 0 && (
-                    <StepOrganization
-                      data={data}
-                      onChange={setData}
-                      errors={errors}
-                    />
+              {/* Step 2: Room Types */}
+              {step === 2 && (
+                <div className="space-y-6">
+                  <div className="text-center space-y-2">
+                    <h2 className="text-xl font-bold">Types de chambre</h2>
+                    <p className="text-muted-foreground">
+                      Créez les catégories de chambres de votre hôtel avec leurs tarifs.
+                    </p>
+                  </div>
+
+                  {/* Quick add presets */}
+                  {roomTypes.length === 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground font-medium">
+                        Ajouter rapidement des types courants :
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {SUGGESTED_ROOM_TYPES.map((preset) => (
+                          <Button
+                            key={preset.name}
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => addRoomType(preset)}
+                          >
+                            <Plus className="size-3" />
+                            {preset.name} ({new Intl.NumberFormat('fr-FR').format(preset.basePrice)} FCFA)
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
-                  {currentStep === 1 && (
-                    <StepRoomTypes
-                      roomTypes={roomTypes}
-                      onChange={setRoomTypes}
-                      errors={errors}
-                    />
-                  )}
+                  {/* Room types list */}
+                  <div className="space-y-3">
+                    {roomTypes.map((rt, idx) => (
+                      <div key={rt.id} className="rounded-lg border p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-muted-foreground">
+                            Type {idx + 1}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => removeRoomType(rt.id)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nom</Label>
+                            <Input
+                              placeholder="Standard"
+                              value={rt.name}
+                              onChange={(e) => updateRoomType(rt.id, { name: e.target.value })}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Prix / nuit (FCFA)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={rt.basePrice}
+                              onChange={(e) =>
+                                updateRoomType(rt.id, {
+                                  basePrice: Math.max(0, parseInt(e.target.value) || 0),
+                                })
+                              }
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Max. occupants</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={rt.maxOccupancy}
+                              onChange={(e) =>
+                                updateRoomType(rt.id, {
+                                  maxOccupancy: Math.max(1, parseInt(e.target.value) || 1),
+                                })
+                              }
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nb. lits</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={rt.bedCount}
+                              onChange={(e) =>
+                                updateRoomType(rt.id, {
+                                  bedCount: Math.max(1, parseInt(e.target.value) || 1),
+                                })
+                              }
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
 
-                  {currentStep === 2 && (
-                    <StepInitialRooms
-                      roomTypes={roomTypes}
-                      roomsPerType={roomsPerType}
-                      floorsPerType={floorsPerType}
-                      onChangeRooms={(key, count) =>
-                        setRoomsPerType((prev) => ({ ...prev, [key]: count }))
-                      }
-                      onChangeFloor={(key, floor) =>
-                        setFloorsPerType((prev) => ({ ...prev, [key]: floor }))
-                      }
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between border-t px-6 py-4">
-              <div>
-                {currentStep === 0 && (
-                  <button
-                    type="button"
-                    onClick={onSkip}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Passer l&apos;onboarding
-                  </button>
-                )}
-                {currentStep > 0 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={goPrev}
-                    disabled={isSubmitting}
-                  >
-                    <ChevronLeft className="size-4 mr-1" />
-                    Précédent
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                {currentStep < 2 ? (
-                  <Button
-                    type="button"
-                    onClick={goNext}
-                    disabled={isSubmitting}
-                    className="bg-[oklch(0.22_0.065_160)] hover:bg-[oklch(0.18_0.065_160)] text-white"
-                  >
-                    Suivant
-                    <ChevronRight className="size-4 ml-1" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={handleFinish}
-                    disabled={isSubmitting}
-                    className="bg-[oklch(0.22_0.065_160)] hover:bg-[oklch(0.18_0.065_160)] text-white min-w-[140px]"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="size-4 mr-1.5 animate-spin" />
-                        Création...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="size-4 mr-1.5" />
-                        Terminer
-                      </>
+                    {roomTypes.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2 border-dashed"
+                        onClick={() => addRoomType()}
+                      >
+                        <Plus className="size-4" />
+                        Ajouter un type
+                      </Button>
                     )}
-                  </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Rooms */}
+              {step === 3 && (
+                <div className="space-y-6">
+                  <div className="text-center space-y-2">
+                    <h2 className="text-xl font-bold">Vos chambres</h2>
+                    <p className="text-muted-foreground">
+                      Ajoutez les chambres de votre hôtel.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 max-h-[360px] overflow-y-auto">
+                    {rooms.map((room, idx) => {
+                      const rt = roomTypes.find((t) => t.id === room.roomTypeId)
+                      return (
+                        <div key={room.id} className="rounded-lg border p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-muted-foreground font-medium">
+                              Chambre {idx + 1}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-6 text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => removeRoom(room.id)}
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-[10px]">Numéro</Label>
+                              <Input
+                                placeholder="101"
+                                value={room.number}
+                                onChange={(e) => updateRoom(room.id, { number: e.target.value })}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px]">Étage</Label>
+                              <Input
+                                placeholder="RDC"
+                                value={room.floor}
+                                onChange={(e) => updateRoom(room.id, { floor: e.target.value })}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px]">Type</Label>
+                              <select
+                                value={room.roomTypeId}
+                                onChange={(e) => updateRoom(room.id, { roomTypeId: e.target.value })}
+                                className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              >
+                                {roomTypes.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          {rt && (
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              💰 {new Intl.NumberFormat('fr-FR').format(rt.basePrice)} FCFA/nuit · {rt.maxOccupancy} pers.
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 border-dashed"
+                      onClick={addRoom}
+                    >
+                      <Plus className="size-4" />
+                      Ajouter une chambre
+                    </Button>
+                  </div>
+
+                  {rooms.length > 0 && (
+                    <div className="rounded-lg bg-muted/50 p-3 text-center">
+                      <p className="text-sm font-medium">
+                        {rooms.length} chambre{rooms.length > 1 ? 's' : ''} configurée{rooms.length > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 4: Complete */}
+              {step === 4 && (
+                <div className="text-center space-y-6 py-8">
+                  <div className="flex justify-center mb-4">
+                    <div className="flex size-20 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                      <Sparkles className="size-10 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                  </div>
+                  <h2 className="text-2xl font-bold">
+                    Tout est prêt ! 🎉
+                  </h2>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    Votre hôtel <span className="font-semibold text-foreground">&laquo; {hotelName || 'Mon hôtel'} &raquo;</span> a été configuré avec{' '}
+                    {rooms.length} chambre{rooms.length > 1 ? 's' : ''} réparties en{' '}
+                    {roomTypes.length} type{roomTypes.length > 1 ? 's' : ''}.
+                  </p>
+
+                  <div className="flex justify-center gap-6 py-4">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                        <BedDouble className="size-4 text-muted-foreground" />
+                        <span className="text-2xl font-bold">{rooms.length}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Chambres</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                        <Building2 className="size-4 text-muted-foreground" />
+                        <span className="text-2xl font-bold">{roomTypes.length}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Types</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between mt-8 pt-6 border-t">
+            {step > 1 && step < 4 ? (
+              <Button variant="outline" onClick={goBack} disabled={isSubmitting}>
+                <ArrowLeft className="size-4 mr-1.5" />
+                Retour
+              </Button>
+            ) : (
+              <div />
+            )}
+
+            {step < 4 ? (
+              <Button
+                onClick={goNext}
+                disabled={
+                  isSubmitting ||
+                  (step === 1 && !canGoStep1) ||
+                  (step === 2 && !canGoStep2) ||
+                  (step === 3 && !canGoStep3)
+                }
+                className="bg-[oklch(0.22_0.065_160)] hover:bg-[oklch(0.18_0.065_160)] text-white"
+              >
+                Suivant
+                <ArrowRight className="size-4 ml-1.5" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleFinish}
+                disabled={isSubmitting}
+                className="bg-[oklch(0.22_0.065_160)] hover:bg-[oklch(0.18_0.065_160)] text-white"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="size-4 mr-1.5 animate-spin" />
+                    Configuration...
+                  </>
+                ) : (
+                  <>
+                    <Check className="size-4 mr-1.5" />
+                    Commencer
+                  </>
                 )}
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

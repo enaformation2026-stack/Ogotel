@@ -13,6 +13,9 @@ import {
   Settings,
   Crown,
   Layers,
+  Calendar,
+  Sparkles,
+  Shield,
 } from 'lucide-react'
 
 import {
@@ -50,6 +53,7 @@ const MAIN_NAV: NavItem[] = [
   { title: 'Dashboard', page: 'dashboard', icon: LayoutDashboard },
   { title: 'Mes Hôtels', page: 'hotels', icon: Building2 },
   { title: 'Réservations', page: 'reservations', icon: CalendarDays },
+  { title: 'Calendrier', page: 'calendar', icon: Calendar },
   { title: 'Chambres', page: 'rooms', icon: BedDouble },
   { title: 'Types de Chambres', page: 'room-types', icon: Layers },
   { title: 'Clients', page: 'guests', icon: Users },
@@ -58,12 +62,18 @@ const MAIN_NAV: NavItem[] = [
 
 const SECONDARY_NAV: NavItem[] = [
   { title: 'Rapports', page: 'reports', icon: BarChart3 },
+  { title: 'Ménage', page: 'housekeeping', icon: Sparkles },
   { title: 'Personnel', page: 'staff', icon: UserCog },
 ]
 
 const FOOTER_NAV: NavItem[] = [
+  { title: 'Abonnement', page: 'subscription', icon: Crown },
   { title: 'Paramètres', page: 'settings', icon: Settings },
-  { title: 'Abonnement', page: 'settings-subscription', icon: Crown },
+]
+
+// Super Admin nav
+const ADMIN_NAV: NavItem[] = [
+  { title: 'Super Admin', page: 'super-admin', icon: Shield },
 ]
 
 // ─── Logo Header ────────────────────────────────────────────────────────────
@@ -205,6 +215,9 @@ function SidebarUserFooter() {
 // ─── Inner sidebar (consumes SidebarContext from parent) ─────────────────────
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const profile = useAuthStore((s) => s.profile)
+  const isSuperAdmin = profile?.role === 'super_admin'
+
   return (
     <Sidebar collapsible="icon" {...props}>
       {/* Header with logo */}
@@ -224,13 +237,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         {/* Secondary nav group */}
         <SidebarGroup>
-          <SidebarGroupLabel>Analytics & Équipe</SidebarGroupLabel>
+          <SidebarGroupLabel>Opérations & Équipe</SidebarGroupLabel>
           <SidebarGroupContent>
             <NavMenu items={SECONDARY_NAV} />
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Footer nav (settings & subscription) pinned to bottom */}
+        {/* Super Admin nav — only for super_admin role */}
+        {isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <NavMenu items={ADMIN_NAV} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Footer nav (subscription & settings) */}
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <NavMenu items={FOOTER_NAV} />

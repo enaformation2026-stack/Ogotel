@@ -60,13 +60,18 @@ import {
 // ── Page name mapping ────────────────────────────────────────────────────────
 const PAGE_NAMES: Record<string, string> = {
   dashboard: 'Tableau de bord',
+  hotels: 'Mes Hôtels',
   reservations: 'Réservations',
+  calendar: 'Calendrier',
   rooms: 'Chambres',
   'room-types': 'Types de chambres',
   guests: 'Clients',
   payments: 'Paiements',
   reports: 'Rapports',
   staff: 'Personnel',
+  housekeeping: 'Ménage',
+  subscription: 'Abonnement',
+  'super-admin': 'Super Admin',
   settings: 'Paramètres',
   'settings-hotel': 'Paramètres - Hôtel',
   'settings-subscription': 'Abonnement',
@@ -237,11 +242,11 @@ export function AppHeader({ className }: { className?: string }) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => useUIStore.getState().setActivePage('settings-account')}>
                 <User className="mr-2 h-4 w-4" />
                 Mon profil
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => useUIStore.getState().setActivePage('settings')}>
                 <Settings className="mr-2 h-4 w-4" />
                 Paramètres
               </DropdownMenuItem>
